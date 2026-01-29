@@ -120,34 +120,12 @@ def cartpole_dynamics_batched(x,u,params):
         u2 = xi[3]
         F_val = ui[0]  
 
-<<<<<<< HEAD
-    def forward(self, x, u):
-        """
-        x: [batch, 4] -> [q1, q2, u1, u2]
-        u: [batch, 1] -> [F]
-        returns: [batch, 4] -> [q1', q2', u1', u2']
-        """
-        q1 = x[:,0:1]  # [batch,1]
-        q2 = x[:,1:2]
-        u1 = x[:,2:3]
-        u2 = x[:,3:4]
-        F_val = u  # [batch,1]
-=======
         mc_val, mp_val, lp_val, Ip_val, g_val = params
->>>>>>> 12fe95f (switched to JAX)
 
         q1d = u1d_func_jax(q1, q2, u1, u2, F_val, mc_val, mp_val, lp_val, Ip_val, g_val)
         q2d = u2d_func_jax(q1, q2, u1, u2, F_val, mc_val, mp_val, lp_val, Ip_val, g_val)
 
-<<<<<<< HEAD
-        q1d = u1d_func_torch(q1, q2, u1, u2, F_val, mc_val, mp_val, lp_val, Ip_val, g_val)
-        q2d = u2d_func_torch(q1, q2, u1, u2, F_val, mc_val, mp_val, lp_val, Ip_val, g_val)
-
-        dxdt = torch.cat([u1, u2, q1d, q2d], dim=1)  # shape [batch,4]
-        return dxdt
-=======
         dxdt = jnp.array([u1, u2, q1d, q2d])
         return dxdt
     dxdt = jax.vmap(single_dynamics, in_axes=(0, 0))(x, u)
     return dxdt
->>>>>>> 12fe95f (switched to JAX)
