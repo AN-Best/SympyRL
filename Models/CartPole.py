@@ -1,4 +1,4 @@
-from sympy import symbols, lambdify, solve
+from sympy import symbols, lambdify, linear_eq_to_matrix
 from sympy.physics.mechanics import *
 import jax
 import jax.numpy as jnp
@@ -96,36 +96,26 @@ sys.add_loads(Force(cart, F*ground_frame.x))
 eom = sys.form_eoms(explicit_kinematics=True)
 
 # Solve for accelerations
-accelerations = solve(eom, [u1.diff(), u2.diff()])
+M, f = linear_eq_to_matrix(eom, [u1.diff(), u2.diff()])
 
 # ------------------------
 # Lambdify to jax
 # ------------------------
-u1d_func_jax = lambdify(
-    [q1, q2, u1, u2, F, mc, mp, lp, Ip, g],
-    accelerations[u1.diff()],
-    modules="jax"
-)
-u2d_func_jax = lambdify(
-    [q1, q2, u1, u2, F, mc, mp, lp, Ip, g],
-    accelerations[u2.diff()],
-    modules="jax"
-)
+M_func_jax = lambdify([q1, q2, u1, u2, mc, mp, lp, Ip], M, modules="jax")
+f_func_jax = lambdify([q1, q2, u1, u2, F, mc, mp, lp, Ip, g], f, modules="jax")
 
-def cartpole_dynamics_batched(x,u,params):
-    def single_dynamics(xi, ui):
-        q1 = xi[0]  
-        q2 = xi[1]
-        u1 = xi[2]
-        u2 = xi[3]
-        F_val = ui[0]  
+def single_dynamics(xi, ui, params):
+    q1, q2, u1, u2 = xi
+    F_val = ui[0]
+    mc_val, mp_val, lp_val, Ip_val, g_val = params
 
-        mc_val, mp_val, lp_val, Ip_val, g_val = params
+    M_val = M_func_jax(q1,q2,u1,u2,mc_val,mp_val,lp_val,Ip_val)
+    f_val = f_func_jax(q1,q2,u1,u2,F_val,mc_val,mp_val,lp_val,Ip_val,g_val)
 
-        q1d = u1d_func_jax(q1, q2, u1, u2, F_val, mc_val, mp_val, lp_val, Ip_val, g_val)
-        q2d = u2d_func_jax(q1, q2, u1, u2, F_val, mc_val, mp_val, lp_val, Ip_val, g_val)
+    qdd = jnp.linalg.solve(M_val, -f_val)
+    return jnp.hstack([u1, u2, qdd[0], qdd[1]])
 
-        dxdt = jnp.array([u1, u2, q1d, q2d])
-        return dxdt
-    dxdt = jax.vmap(single_dynamics, in_axes=(0, 0))(x, u)
-    return dxdt
+@jax.jit
+def cartpole_dynamics_batched(x, u, params):
+    return jax.vmap(single_dynamics, in_axes=(0,0,None))(x, u, params)
+

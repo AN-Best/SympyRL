@@ -3,93 +3,64 @@ import jax.numpy as jnp
 import numpy as np
 import sys
 from pathlib import Path
-import functools
+import time
 
-
-# Get the parent folder (one level up)
 parent_folder = Path(__file__).resolve().parent.parent
-
-# Add Models and Solvers folders to sys.path
 sys.path.insert(0, str(parent_folder / "Models"))
 sys.path.insert(0, str(parent_folder / "Solvers"))
 
-
-# Import your dynamics and RK4 functions
 from CartPole import cartpole_dynamics_batched
-from SymplecticRK4 import symplectic_rk4_step  
+from SymplecticRK4 import symplectic_rk4_step
 
-f = lambda x, u: cartpole_dynamics_batched(x, u, params)
-solver_jit = jax.jit(symplectic_rk4_step, static_argnums=(0,))
-
-# ------------------------
-# Physical parameters
-# ------------------------
-params = (1.0, 0.1, 1.0, 0.01, 9.81)  # mc, mp, lp, Ip, g
-
-print(jax.devices())
-
-# ------------------------
-# Energy function
-# ------------------------
-def cartpole_energy(x, params):
-    """
-    Compute total mechanical energy (cart + pole)
-    x: [batch,4] -> [q1, q2, u1, u2]
-    """
-    mc, mp, lp, Ip, g = params
-    q1 = x[:,0]
-    q2 = x[:,1]
-    u1 = x[:,2]
-    u2 = x[:,3]
-
-    # Cart kinetic
-    T_cart = 0.5 * mc * u1**2
-
-    # Pole kinetic (translational + rotational)
-    v_pole_x = u1 + (lp/2) * u2 * jnp.cos(q2)
-    v_pole_y = (lp/2) * u2 * jnp.sin(q2)
-    T_pole = 0.5 * mp * (v_pole_x**2 + v_pole_y**2) + 0.5 * Ip * u2**2
-
-    # Potential energy (only gravity)
-    V_pole = mp * g * (lp/2) * jnp.cos(q2)
-    V_cart = 0.0
-
-    E = T_cart + T_pole + V_cart + V_pole
-    return E
-
-# ------------------------
-# Simulation parameters
-# ------------------------
-batch_size = 10000
+params = jnp.array([1.0, 0.1, 1.0, 0.01, 9.81])
+batch_size = 100000
 dt = 0.002
-steps = int(10.0/dt)
+T = 10.0
+steps = int(T/dt)
 
-# Random initial states [q1, q2, u1, u2]
+# Initial state
 rng = np.random.default_rng(42)
-x0 = jnp.array(rng.uniform(-0.05,0.05,(batch_size,4)))
-t0 = 0.0
-u = jnp.zeros((batch_size,1))  # unactuated
+x0 = jnp.array(rng.uniform(-0.05, 0.05, (batch_size, 4)))
+u = jnp.zeros((batch_size, 1))  # unactuated
 
 # ------------------------
-# Record energy
+# Fully fused simulation (no energy)
 # ------------------------
-energies = []
+def run_simulation_memory_efficient(x0, u, dt, params, steps):
+    state = x0
+    t = 0.0
 
-def step(carry, _):
-    x, t = carry
-    x, t = solver_jit(cartpole_dynamics_batched, x, t, u, dt,params)
-    e = cartpole_energy(x, params)
-    return (x, t), e
+    def body_fun(i, val):
+        state, t = val
+        state, t = symplectic_rk4_step(cartpole_dynamics_batched, state, t, u, dt, params)
+        return state, t
 
-(carry_final), energies = jax.lax.scan(step, (x0, t0), None, length=steps)
-
-energies = jnp.stack(energies)  # [steps, batch]
+    state, t = jax.lax.fori_loop(0, steps, body_fun, (state, t))
+    return state
 
 # ------------------------
-# Print energy drift
+# JIT compile (steps must be static)
 # ------------------------
-E0 = energies[0]
-E_final = energies[-1]
-drift = jnp.abs(E_final - E0) / E0
-for i in range(batch_size):
-    print(f"Pole {i}: initial={E0[i]:.5f}, final={E_final[i]:.5f}, relative drift={drift[i]:.5e}")
+run_simulation_jit = jax.jit(run_simulation_memory_efficient, static_argnums=(4,))
+
+# ------------------------
+# First run (compilation)
+# ------------------------
+print("Compiling and running first simulation...")
+start_time = time.time()
+x_final = run_simulation_jit(x0, u, dt, params, steps)
+jax.device_get(x_final)  # force computation
+first_duration = time.time() - start_time
+print(f"First run (including JIT compile): {first_duration:.3f} s")
+
+# ------------------------
+# Second run (pure execution)
+# ------------------------
+print("Running second simulation (timed)...")
+start_time = time.time()
+x_final = run_simulation_jit(x0, u, dt, params, steps)
+jax.device_get(x_final)  # force computation
+second_duration = time.time() - start_time
+print(f"Second run (pure execution): {second_duration:.3f} s")
+
+
