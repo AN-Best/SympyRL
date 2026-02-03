@@ -2,6 +2,7 @@ from sympy import symbols, lambdify, linear_eq_to_matrix
 from sympy.physics.mechanics import *
 import jax
 import jax.numpy as jnp
+import torch
 
 # ------------------------
 # Generalized coordinates
@@ -104,7 +105,16 @@ M, f = linear_eq_to_matrix(eom, [u1.diff(), u2.diff()])
 M_func_jax = lambdify([q1, q2, u1, u2, mc, mp, lp, Ip], M, modules="jax")
 f_func_jax = lambdify([q1, q2, u1, u2, F, mc, mp, lp, Ip, g], f, modules="jax")
 
-def single_dynamics(xi, ui, params):
+# ------------------------
+# Lambdify to torch
+# ------------------------
+M_func_torch = lambdify([q1, q2, u1, u2, mc, mp, lp, Ip], M, modules="torch")
+f_func_torch = lambdify([q1, q2, u1, u2, F, mc, mp, lp, Ip, g], f, modules="torch")
+
+# ------------------------
+# Jax Dynamics Function
+# ------------------------
+def cartpole_dynamics_single_jax(xi, ui, params):
     q1, q2, u1, u2 = xi
     F_val = ui[0]
     mc_val, mp_val, lp_val, Ip_val, g_val = params
@@ -116,6 +126,26 @@ def single_dynamics(xi, ui, params):
     return jnp.hstack([u1, u2, qdd[0], qdd[1]])
 
 @jax.jit
-def cartpole_dynamics_batched(x, u, params):
-    return jax.vmap(single_dynamics, in_axes=(0,0,None))(x, u, params)
+def cartpole_dynamics_batched_jax(x, u, params):
+    return jax.vmap(cartpole_dynamics_single_jax, in_axes=(0,0,None))(x, u, params)
+
+# ------------------------
+# Torch Dynamics Function
+# ------------------------
+def cartpole_dynamics_single_torch(xi, ui, params):
+    q1, q2, u1, u2 = xi
+    F_val = ui[0]
+    mc_val, mp_val, lp_val, Ip_val, g_val = params
+
+    M_val = M_func_torch(q1,q2,u1,u2,mc_val,mp_val,lp_val,Ip_val)
+    f_val = f_func_torch(q1,q2,u1,u2,F_val,mc_val,mp_val,lp_val,Ip_val,g_val)
+
+    qdd = torch.linalg.solve(M_val, -f_val)
+    return torch.hstack([u1, u2, qdd[0], qdd[1]])
+
+def cartpole_dynamics_batched_torch(x,u,params):
+    return torch.vmap(cartpole_dynamics_single_torch, in_dims=(0, 0, None))(x, u, params)
+
+cartpole_dynamics_batched_torch = torch.compile(cartpole_dynamics_batched_torch)
+
 
