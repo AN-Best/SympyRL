@@ -223,4 +223,3 @@ def cartpole_dynamics_single_torch(xi, ui, params):
 def cartpole_dynamics_batched_torch(x, u, params):
     return torch.vmap(cartpole_dynamics_single_torch, in_dims=(0, 0, None))(x, u, params)
 
-cartpole_dynamics_batched_torch = torch.compile(cartpole_dynamics_batched_torch)

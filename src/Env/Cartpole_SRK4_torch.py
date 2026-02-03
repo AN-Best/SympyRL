@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 import gymnasium as gym
 from gymnasium.utils.env_checker import check_env
+import matplotlib.pyplot as plt
 
 parent_folder = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(parent_folder / "Models"))
@@ -17,6 +18,10 @@ class CartPoleEnv_srk4_torch(gym.Env):
     def __init__(self):
         
         #Parameters
+
+        self.dynamics_func = torch.compile(cartpole_dynamics_batched_torch)
+
+
         self.params = (1.0, 0.1, 1.0, 0.01, 9.81)
         self.dt = 0.002
         self.t = 0.0
@@ -41,7 +46,7 @@ class CartPoleEnv_srk4_torch(gym.Env):
         self.state = torch.tensor([0.0, np.pi, 0.0, 0.0], dtype=torch.float32)
         self.t = 0.0
         self.step_number = 0
-        observation = self.state.numpy()
+        observation = self.state.cpu().numpy()
         info = {}
         return observation, info
 
@@ -62,7 +67,7 @@ class CartPoleEnv_srk4_torch(gym.Env):
         
         # Use symplectic RK4 integrator
         state_next, t_next = symplectic_rk4_step_torch(
-            cartpole_dynamics_batched_torch,
+            self.dynamics_func,
             state_batched, 
             self.t, 
             u_batched, 
@@ -81,14 +86,70 @@ class CartPoleEnv_srk4_torch(gym.Env):
             terminated = True
         
         q1, q2, u1, u2 = self.state
+
+        angle = q2.item() % (2 * np.pi)
         
-        reward = np.cos(q2.item()) - 0.01*q1.item()**2 - 0.001*u1.item()**2 - 0.001*u2.item()**2
+        reward = -angle**2 - 0.1*q1.item()**2 - 0.01*u1.item()**2 - 0.01*u2.item()**2
         
-        observation = self.state.numpy()
+        observation = self.state.cpu().numpy()
         info = {}
         truncated = False
         
         return observation, reward, terminated, truncated, info
+    
+    def render(self):
+        """Render the cart-pole system using matplotlib"""
+        if not hasattr(self, 'fig'):
+            # Initialize plot on first call
+            plt.ion()
+            self.fig, self.ax = plt.subplots(figsize=(8, 6))
+            self.ax.set_xlim(-3, 3)
+            self.ax.set_ylim(-2, 2)
+            self.ax.set_aspect('equal')
+            self.ax.grid(True)
+            
+        # Clear previous frame
+        self.ax.clear()
+        self.ax.set_xlim(-3, 3)
+        self.ax.set_ylim(-2, 2)
+        self.ax.set_aspect('equal')
+        self.ax.grid(True)
+        
+        # Extract state
+        q1, q2, u1, u2 = self.state
+        cart_x = q1.item() if isinstance(q1, torch.Tensor) else q1
+        pole_angle = q2.item() if isinstance(q2, torch.Tensor) else q2
+        
+        # Cart parameters (approximate)
+        cart_width = 0.3
+        cart_height = 0.2
+        pole_length = 1.0  # Adjust based on your lp parameter
+        
+        # Draw ground
+        self.ax.plot([-3, 3], [0, 0], 'k-', linewidth=2)
+        
+        # Draw cart
+        cart = plt.Rectangle((cart_x - cart_width/2, 0), 
+                            cart_width, cart_height, 
+                            facecolor='blue', edgecolor='black', linewidth=2)
+        self.ax.add_patch(cart)
+        
+        # Draw pole
+        pole_x = cart_x + pole_length * np.sin(pole_angle)
+        pole_y = cart_height + pole_length * np.cos(pole_angle)
+        self.ax.plot([cart_x, pole_x], [cart_height, pole_y], 'r-', linewidth=3)
+        
+        # Add info text
+        self.ax.text(-2.8, 1.8, f'Time: {self.t:.2f}s', fontsize=10)
+        self.ax.text(-2.8, 1.6, f'Angle: {np.degrees(pole_angle):.1f}°', fontsize=10)
+        
+        plt.draw()
+        plt.pause(0.001)
+
+def close(self):
+    """Close the rendering window"""
+    if hasattr(self, 'fig'):
+        plt.close(self.fig)
         
         
 if __name__ == "__main__":
