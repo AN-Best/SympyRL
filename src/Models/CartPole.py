@@ -3,6 +3,7 @@ from sympy.physics.mechanics import *
 import jax
 import jax.numpy as jnp
 import torch
+from sympy.printing.pycode import PythonCodePrinter
 
 # ------------------------
 # Generalized coordinates
@@ -108,14 +109,85 @@ f_func_jax = lambdify([q1, q2, u1, u2, F, mc, mp, lp, Ip, g], f, modules="jax")
 # ------------------------
 # Lambdify to torch
 # ------------------------
-M_func_torch = lambdify([q1, q2, u1, u2, mc, mp, lp, Ip], M, modules="torch")
-f_func_torch = lambdify([q1, q2, u1, u2, F, mc, mp, lp, Ip, g], f, modules="torch")
+
+class TorchPrinter(PythonCodePrinter):
+
+    def __init__(self):
+        super().__init__()
+        # Map function names to torch equivalents
+        self.known_functions = {
+            'sin': 'torch.sin',
+            'cos': 'torch.cos',
+            'tan': 'torch.tan',
+            'asin': 'torch.asin',
+            'acos': 'torch.acos',
+            'atan': 'torch.atan',
+            'atan2': 'torch.atan2',
+            'exp': 'torch.exp',
+            'log': 'torch.log',
+            'sqrt': 'torch.sqrt',
+            'abs': 'torch.abs',
+        }
+
+    """Custom printer that uses ** operator instead of pow()"""
+    
+    def _print_Pow(self, expr):
+        base = self._print(expr.base)
+        exp = self._print(expr.exp)
+        return f"({base})**({exp})"
+    
+    
+    def _print_ImmutableDenseMatrix(self, expr):
+        """Print matrix as nested torch.stack calls"""
+        rows = []
+        for i in range(expr.rows):
+            row_elements = [self._print(expr[i, j]) for j in range(expr.cols)]
+            if expr.cols == 1:
+                # Single column - just the element
+                rows.append(row_elements[0])
+            else:
+                # Multiple columns - stack along last dimension
+                rows.append(f"torch.stack([{', '.join(row_elements)}], dim=-1)")
+        
+        if expr.rows == 1:
+            # Single row
+            if expr.cols == 1:
+                return rows[0]
+            else:
+                return rows[0]  # Already stacked above
+        else:
+            # Multiple rows
+            if expr.cols == 1:
+                # Vector: stack elements (no extra dim needed)
+                return f"torch.stack([{', '.join(rows)}], dim=-1)"
+            else:
+                # Matrix: stack rows
+                return f"torch.stack([{', '.join(rows)}], dim=-1)"
+
+# Use the custom printer
+torch_printer = TorchPrinter()
+
+M_func_torch = lambdify(
+    [q1, q2, u1, u2, mc, mp, lp, Ip],
+    M,
+    modules='torch',
+    printer=torch_printer,
+    cse=False
+)
+
+f_func_torch = lambdify(
+    [q1, q2, u1, u2, F, mc, mp, lp, Ip, g],
+    f,
+    modules='torch',
+    printer=torch_printer,
+    cse=False
+)
 
 # ------------------------
 # Jax Dynamics Function
 # ------------------------
 def cartpole_dynamics_single_jax(xi, ui, params):
-    q1, q2, u1, u2 = xi
+    q1, q2, u1, u2 = xi[0], xi[1], xi[2], xi[3]  
     F_val = ui[0]
     mc_val, mp_val, lp_val, Ip_val, g_val = params
 
@@ -133,8 +205,13 @@ def cartpole_dynamics_batched_jax(x, u, params):
 # Torch Dynamics Function
 # ------------------------
 def cartpole_dynamics_single_torch(xi, ui, params):
-    q1, q2, u1, u2 = xi
+    q1, q2, u1, u2 = xi[0], xi[1], xi[2], xi[3]  
     F_val = ui[0]
+
+    if not isinstance(params[0], torch.Tensor):
+        # Convert to tensors matching the dtype/device of xi
+        params = tuple(torch.as_tensor(p, dtype=xi.dtype, device=xi.device) for p in params)
+    
     mc_val, mp_val, lp_val, Ip_val, g_val = params
 
     M_val = M_func_torch(q1,q2,u1,u2,mc_val,mp_val,lp_val,Ip_val)
@@ -143,9 +220,7 @@ def cartpole_dynamics_single_torch(xi, ui, params):
     qdd = torch.linalg.solve(M_val, -f_val)
     return torch.hstack([u1, u2, qdd[0], qdd[1]])
 
-def cartpole_dynamics_batched_torch(x,u,params):
+def cartpole_dynamics_batched_torch(x, u, params):
     return torch.vmap(cartpole_dynamics_single_torch, in_dims=(0, 0, None))(x, u, params)
 
 cartpole_dynamics_batched_torch = torch.compile(cartpole_dynamics_batched_torch)
-
-
