@@ -26,7 +26,9 @@ class CartPoleEnv_srk4_torch(gym.Env):
         self.dt = 0.002
         self.t = 0.0
         self.step_number = 0
-        self.max_steps = int(10.0/self.dt)
+        self.max_steps = int(5.0/self.dt)
+        self.max_angle = np.pi/3
+        self.max_dist = 3.0
 
         #Action space
         self.action_space = gym.spaces.Box(low=-1.0,high=1.0,shape=(1,),dtype=np.float32)
@@ -43,14 +45,18 @@ class CartPoleEnv_srk4_torch(gym.Env):
     def reset(self, seed=None, **kwargs):
         super().reset(seed=seed)
         # State is shape [4], no batch dimension needed here
-        self.state = torch.tensor([0.0, np.pi, 0.0, 0.0], dtype=torch.float32)
+        self.state = torch.tensor([np.random.uniform(-0.5,0.5),
+                                np.random.uniform(-np.pi/6, np.pi/6),
+                                np.random.uniform(-0.5,0.5),
+                                np.random.uniform(-0.5,0.5),], 
+                                dtype=torch.float32)
         self.t = 0.0
         self.step_number = 0
         observation = self.state.cpu().numpy()
         info = {}
         return observation, info
 
-    def step(self, action, f_scale=100.0):
+    def step(self, action, f_scale=300.0):
         # Convert action to tensor if it's a numpy array
         if isinstance(action, np.ndarray):
             action = torch.from_numpy(action).float()
@@ -82,14 +88,22 @@ class CartPoleEnv_srk4_torch(gym.Env):
         self.step_number += 1
         
         terminated = False
-        if self.step_number >= self.max_steps:
-            terminated = True
-        
         q1, q2, u1, u2 = self.state
 
-        angle = q2.item() % (2 * np.pi)
-        
-        reward = -angle**2 - 0.1*q1.item()**2 - 0.01*u1.item()**2 - 0.01*u2.item()**2
+        angle = np.arctan2(np.sin(q2.item()), np.cos(q2.item()))
+
+        if np.abs(q1.item()) > self.max_dist or np.abs(q2.item()) > self.max_angle:
+            terminated = True
+    
+        if terminated:
+            reward = 0
+        else:
+            reward = 1 + np.cos(angle) - 0.1*u1.item()**2
+
+
+        if self.step_number >= self.max_steps:
+            terminated = True
+            reward = 100
         
         observation = self.state.cpu().numpy()
         info = {}
