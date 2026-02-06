@@ -1,6 +1,9 @@
-from sympy import symbols, lambdify, solve
+from sympy import symbols, lambdify, linear_eq_to_matrix
 from sympy.physics.mechanics import *
+import jax
+import jax.numpy as jnp
 import torch
+from sympy.printing.pycode import PythonCodePrinter
 
 #Coordinates
 q1, q2 = dynamicsymbols("q1 q2")  # angles
@@ -51,54 +54,118 @@ fr, frstar = KM.kanes_equations([pendulum1, pendulum2], loads)
 
 eom = fr + frstar
 
-accelerations = solve(eom, [u1.diff(), u2.diff()], dict=True)[0]
+M, f = linear_eq_to_matrix(eom, [u1.diff(), u2.diff()])
 
-u1d_func_torch = lambdify(
-    [q1, q2, u1, u2, T, m, l, I, g],
-    accelerations[u1.diff()],
-    modules="torch"
-)
-u2d_func_torch = lambdify(
-    [q1, q2, u1, u2, T, m, l, I, g],
-    accelerations[u2.diff()],
-    modules="torch"
-)
+#Lambdify to JAX
+M_func_jax = lambdify([q1, q2, u1, u2, m, l, I],M,modules="jax")
+f_func_jax = lambdify([q1, q2, u1, u2, T, m, l, I, g],f,modules="jax")
 
-# ------------------------
-# Torch batched dynamics
-# ------------------------
-class AcrobotDynamicsBatched(torch.nn.Module):
-    def __init__(self, params):
-        """
-        params: list or tensor [m, l, I, g]
-        Should be torch tensor on the correct device for GPU use.
-        """
+#Lambdify to Torch
+class TorchPrinter(PythonCodePrinter):
+
+    def __init__(self):
         super().__init__()
-        # Convert scalars to tensors once, on correct device
-        if not isinstance(params, torch.Tensor):
-            params = torch.tensor(params, dtype=torch.float32)
-        self.register_buffer("params", params)  # registers a buffer, so it moves with .to(device)
+        # Map function names to torch equivalents
+        self.known_functions = {
+            'sin': 'torch.sin',
+            'cos': 'torch.cos',
+            'tan': 'torch.tan',
+            'asin': 'torch.asin',
+            'acos': 'torch.acos',
+            'atan': 'torch.atan',
+            'atan2': 'torch.atan2',
+            'exp': 'torch.exp',
+            'log': 'torch.log',
+            'sqrt': 'torch.sqrt',
+            'abs': 'torch.abs',
+        }
 
-    def forward(self, x, u):
-        """
-        x: [batch, 4] -> [q1, q2, u1, u2]
-        u: [batch, 1] -> [T]
-        returns: [batch, 4] -> [q1', q2', u1', u2']
-        """
-        q1, q2, u1, u2 = x[:,0], x[:,1], x[:,2], x[:,3]
-        F_val = u[:,0]
+    """Custom printer that uses ** operator instead of pow()"""
+    
+    def _print_Pow(self, expr):
+        base = self._print(expr.base)
+        exp = self._print(expr.exp)
+        return f"({base})**({exp})"
+    
+    
+    def _print_ImmutableDenseMatrix(self, expr):
+        """Print matrix as nested torch.stack calls"""
+        rows = []
+        for i in range(expr.rows):
+            row_elements = [self._print(expr[i, j]) for j in range(expr.cols)]
+            if expr.cols == 1:
+                # Single column - just the element
+                rows.append(row_elements[0])
+            else:
+                # Multiple columns - stack along last dimension
+                rows.append(f"torch.stack([{', '.join(row_elements)}], dim=-1)")
+        
+        if expr.rows == 1:
+            # Single row
+            if expr.cols == 1:
+                return rows[0]
+            else:
+                return rows[0]  # Already stacked above
+        else:
+            # Multiple rows
+            if expr.cols == 1:
+                # Vector: stack elements (no extra dim needed)
+                return f"torch.stack([{', '.join(rows)}], dim=-1)"
+            else:
+                # Matrix: stack rows
+                return f"torch.stack([{', '.join(rows)}], dim=-1)"
 
-        m_val, l_val, I_val, g_val = self.params
+# Use the custom printer
+torch_printer = TorchPrinter()
 
-        # Call torch-lambdified functions
-        q1d = u1d_func_torch(q1, q2, u1, u2, F_val, m_val, l_val, I_val, g_val)
-        q2d = u2d_func_torch(q1, q2, u1, u2, F_val, m_val, l_val, I_val, g_val)
-
-        # Clamp small numerical instabilities
-        q1d = torch.nan_to_num(q1d, nan=0.0, posinf=50.0, neginf=-50.0)
-        q2d = torch.nan_to_num(q2d, nan=0.0, posinf=50.0, neginf=-50.0)
-
-        return torch.stack([u1, u2, q1d, q2d], dim=1)
+M_func_torch = lambdify(
+    [q1, q2, u1, u2, m, l, I],
+    M,
+    modules="torch",
+    printer=torch_printer,
+    cse = False)
 
 
+f_func_torch = lambdify(
+    [q1, q2, u1, u2, T, m, l, I, g],
+    f,
+    modules="torch",
+    printer=torch_printer,
+    cse = False)
 
+#Jax dynamics function
+def acrobot_dynamics_single_jax(xi, ui, params):
+    q1, q2, u1, u2 = xi[0], xi[1], xi[2], xi[3]  
+    T_val = ui[0]
+    m_val, l_val, I_val, g_val = params
+
+    M_val = M_func_jax(q1,q2,u1,u2,m_val,l_val,I_val)
+    f_val = f_func_jax(q1,q2,u1,u2,T_val,m_val,l_val,I_val,g_val)
+
+    qdd = jnp.linalg.solve(M_val, -f_val)
+    return jnp.hstack([u1, u2, qdd[0], qdd[1]])
+
+@jax.jit
+def acrobot_dynamics_batched_jax(x, u, params):
+    return jax.vmap(acrobot_dynamics_single_jax, in_axes=(0,0,None))(x, u, params)
+
+#Torch dynamics function
+def acrobot_dynamics_single_torch(xi, ui, params):
+    q1, q2, u1, u2 = xi[0], xi[1], xi[2], xi[3]  
+    T_val = ui[0]
+
+    if not isinstance(params[0], torch.Tensor):
+        # Convert to tensors matching the dtype/device of xi
+        params = tuple(torch.as_tensor(p, dtype=xi.dtype, device=xi.device) for p in params)
+    
+
+    m_val, l_val, I_val, g_val = params
+
+    M_val = M_func_torch(q1,q2,u1,u2,m_val,l_val,I_val)
+    f_val = f_func_torch(q1,q2,u1,u2,T_val,m_val,l_val,I_val,g_val)
+
+    qdd = torch.linalg.solve(M_val, -f_val)
+    return torch.hstack([u1, u2, qdd[0], qdd[1]])
+
+def acrobot_dynamics_batched_torch(x, u, params):
+    return torch.vmap(acrobot_dynamics_single_torch, in_dims=(0, 0, None))(x, u, params)
