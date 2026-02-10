@@ -24,7 +24,7 @@ def make_env():
 if __name__ == '__main__':
     mp.set_start_method('spawn', force=True)
     
-    num_envs = 8
+    num_envs = 16
     env = SubprocVecEnv([make_env() for _ in range(num_envs)])
     
     # TensorBoard log directory (timestamped)

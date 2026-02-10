@@ -24,10 +24,6 @@ class AcrobotEnv_srk4_torch(gym.Env):
         self.t = 0.0
         self.step_number = 0
         self.max_steps = int(5.0/self.dt)
-        self.angle_space = np.deg2rad(5.0)
-        self.goal_angle = np.deg2rad(180.0)
-        self.low_angle = self.goal_angle - self.angle_space
-        self.high_angle = self.goal_angle + self.angle_space
 
         #Action space
         self.action_space = gym.spaces.Box(low=-1.0,high=1.0,shape=(1,),dtype=np.float32)
@@ -46,8 +42,8 @@ class AcrobotEnv_srk4_torch(gym.Env):
 
         self.state = torch.tensor([np.random.uniform(-np.pi/2, np.pi/2),
                                    np.random.uniform(-np.pi/2, np.pi/2),
-                                   np.random.uniform(-5.0,5.0),
-                                   np.random.uniform(-5.0,5.0)])
+                                   np.random.uniform(-3.0,3.0),
+                                   np.random.uniform(-3.0,3.0)])
 
 
         self.t = 0.0
@@ -57,7 +53,7 @@ class AcrobotEnv_srk4_torch(gym.Env):
 
         return observation, info
     
-    def step(self,action,T_scale=200.0):
+    def step(self,action,T_scale=400.0):
 
         # Convert action to tensor if it's a numpy array
         if isinstance(action, np.ndarray):
@@ -97,10 +93,12 @@ class AcrobotEnv_srk4_torch(gym.Env):
         terminated = False
         q1, q2, u1, u2 = self.state
 
-        ang1 = np.abs(np.arctan2(np.sin(q1.item()), np.cos(q1.item())))
-        ang2 = np.abs(np.arctan2(np.sin(q2.item()), np.cos(q2.item())))
+        ang1 = np.arctan2(np.sin(q1.item()), np.cos(q1.item()))
+        ang2 = np.arctan2(np.sin(q2.item()), np.cos(q2.item()))
 
-        reward = -np.cos(ang1) - np.cos(ang1 + ang2) - 0.01*u1.item()**2 - 0.01*u2.item()**2
+        h = -1.0*np.cos(ang1) - 1.0*np.cos(ang1+ang2)
+
+        reward = -(1.9 - h)
 
         if self.step_number >= self.max_steps:
             terminated = True
