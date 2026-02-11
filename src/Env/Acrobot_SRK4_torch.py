@@ -98,7 +98,10 @@ class AcrobotEnv_srk4_torch(gym.Env):
 
         h = -1.0*np.cos(ang1) - 1.0*np.cos(ang1+ang2)
 
-        reward = -(1.9 - h)
+        reward = -(1.8 - h)
+
+        if reward > 0.0:
+            reward += 10
 
         if self.step_number >= self.max_steps:
             terminated = True
