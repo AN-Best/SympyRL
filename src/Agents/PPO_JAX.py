@@ -324,7 +324,7 @@ def make_train(config):
 if __name__ == "__main__":
     config = {
         "LR": 3e-4,
-        "NUM_ENVS": 4096,  
+        "NUM_ENVS": 2048,  
         "NUM_STEPS": 256,
         "TOTAL_TIMESTEPS": 40e8,  
         "UPDATE_EPOCHS": 10,
