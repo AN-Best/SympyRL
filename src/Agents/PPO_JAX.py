@@ -326,7 +326,7 @@ if __name__ == "__main__":
         "LR": 3e-4,
         "NUM_ENVS": 2048,  
         "NUM_STEPS": 256,
-        "TOTAL_TIMESTEPS": 40e8,  
+        "TOTAL_TIMESTEPS": 80e8,  
         "UPDATE_EPOCHS": 10,
         "NUM_MINIBATCHES": 4,
         "GAMMA": 0.99,
@@ -335,7 +335,7 @@ if __name__ == "__main__":
         "ENT_COEF": 0.01,  
         "VF_COEF": 0.5,
         "MAX_GRAD_NORM": 0.5,
-        "ACTIVATION": "tanh",
+        "ACTIVATION": "relu",
         "ANNEAL_LR": True,
     }
 

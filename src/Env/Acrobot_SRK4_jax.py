@@ -239,7 +239,7 @@ class AcrobotEnv:
         speed_penalty = jnp.pow(state.u1,2) + jnp.pow(state.u2,2)
         
         # Combine rewards
-        reward = height_reward + success_bonus - 0.01*speed_penalty
+        reward = height_reward + success_bonus - 0.1*speed_penalty
         
         return reward
 
