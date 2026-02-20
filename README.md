@@ -1,74 +1,33 @@
 # SympyRL Documentation
 
-## What is SympyRL?
-SympyRL is a reinforcement learning framework that leverages symbolic computation techniques to optimize the learning process. It is designed to provide a comprehensive interface for researchers and practitioners who are developing and testing reinforcement learning algorithms in a symbolic context.
+## Overview
+SympyRL is a library designed for reinforcement learning with robust symbolic capabilities. It serves as an efficient symbolic physics engine to simulate various environments, easily integrating with popular machine learning frameworks like PyTorch and JAX.
 
 ## Current Capabilities
-| Capability              | Status   |
-|------------------------|----------|
-| Symbolic Representation | ✅ Available |
-| Model Training         | ✅ Available |
-| Model Evaluation       | ✅ Available |
-| Integration with OpenAI Gym | ✅ Available |
-| Custom Environment Setup| ✅ Available |
 
-## Implemented Models and Solvers
-- **Q-Learning**
-- **Deep Q-Networks (DQN)**
-- **Policy Gradient Methods**
-- **Actor-Critic Methods**
+### 1. Symbolic Physics Engine
+The heart of SympyRL lies in its symbolic physics engine that allows dynamic modification of physics simulations, enabling flexibility and deep insights into the underlying mechanics of the systems being modeled.
 
-## System Architecture
-SympyRL consists of several main components:
-1. **Core Engine:** Responsible for the reinforcement learning logic.
-2. **Environment Handler:** Manages interactions with various environments.
-3. **Model Management:** Contains all implemented models and solvers.
-4. **Symbolic Computation Module:** Integrates symbolic capabilities.
+### 2. Models
+SympyRL includes several predefined models that demonstrate its capabilities:
+- **CartPole**: A classic reinforcement learning task that showcases stability and control mechanics.
+- **Acrobot**: A two-link arm robot model that tests complex dynamics and control strategies.
 
-## Quick Start Examples
-```python
-from sympy_rl import SympyREnvironment, QLearningAgent
+### 3. Solvers
+Our library offers various solvers optimized for performance and accuracy, including:
+- Symplectic integrators that maintain geometric properties of the systems.
+- Adaptive step-size methods for efficient computation.
 
-environment = SympyREnvironment()
-agent = QLearningAgent(environment)
-agent.train(episodes=1000)
-```
+### 4. Quick Start Examples
+To get started quickly, check out the provided examples that help in implementing reinforcement learning tasks using the CartPole and Acrobot models. You'll see how easy it is to set up an environment, train a model, and visualize the results.
 
-## Project Structure
-- `sympy_rl/`: Main package
-  - `models/`: Contains implementation of different RL models
-  - `environments/`: Custom RL environments
-  - `utils/`: Utilities for training and evaluation
+### 5. Roadmap
+SympyRL aims to expand its capabilities further in the following areas:
+- Enhanced support for GPU-accelerated simulations with batched processing.
+- Development of additional pre-trained policies for popular environments.
+- Continued integration with leading machine learning frameworks to provide an expansive toolkit for developers.
 
-## Design Philosophy
-SympyRL is built with a focus on modularity and extensibility, allowing users to easily implement their own models and customize environments to fit their needs. The framework aims to balance between performance and simplicity to make it accessible to both novices and experts alike.
-
-## Roadmap
-- **Q2 2026:** Release of additional models including advanced deep learning algorithms.
-- **Q3 2026:** Improved documentation and more comprehensive examples.
-- **Q4 2026:** Integration with other symbolic computation libraries for greater functionality.
-
-## Installation
-You can install SympyRL using pip:
-```
-pip install sympy_rl
-```
-
-## Citation
-If you find SympyRL useful in your research or projects, please cite it as follows:
-```
-@misc{sympyrl,
-  title={SympyRL: A Symbolic Reinforcement Learning Framework},
-  author={AN-Best},
-  year={2026},
-}  
-```
-
-## License
-MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Contact
-For inquiries, please contact [AN-Best](mailto:youremail@example.com).
-
-## Acknowledgements
-We would like to thank the community for their contributions and support in developing SympyRL.
+## Emphasizing Key Features
+- **Backend Support**: SympyRL is built to support both PyTorch and JAX, providing users with flexibility in their choice of tools for model training and evaluation.
+- **Batched GPU Simulation**: The library supports batched environments, allowing for more efficient learning and simulation processes that leverage modern GPU architectures.
+- **Pre-trained Policies**: Users can access pre-trained models that can be fine-tuned or utilized directly for different tasks in the symbolic physics simulations.
