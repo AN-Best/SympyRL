@@ -1,42 +1,74 @@
 # SympyRL Documentation
 
-## Overview
-SympyRL is a library that leverages the power of SymPy to enable Reinforcement Learning (RL) applications. Here are the current capabilities of the library:
+## What is SympyRL?
+SympyRL is a reinforcement learning framework that leverages symbolic computation techniques to optimize the learning process. It is designed to provide a comprehensive interface for researchers and practitioners who are developing and testing reinforcement learning algorithms in a symbolic context.
 
-### Features
-- **Symbolic Representation**: Store and manipulate models symbolically using SymPy.
-- **Gradient Computation**: Compute gradients of complex functions symbolically.
-- **Custom RL Algorithms**: Implement custom RL algorithms with symbolic reasoning.
-- **Integration with OpenAI Gym**: Seamless integration with OpenAI Gym environments for RL experimentation.
-- **Data Analysis Tools**: Tools for analyzing and visualizing results symbolically.
+## Current Capabilities
+| Capability              | Status   |
+|------------------------|----------|
+| Symbolic Representation | ✅ Available |
+| Model Training         | ✅ Available |
+| Model Evaluation       | ✅ Available |
+| Integration with OpenAI Gym | ✅ Available |
+| Custom Environment Setup| ✅ Available |
 
-### Installation
-To install SympyRL, run:
-```bash
-pip install sympyrl
-```
+## Implemented Models and Solvers
+- **Q-Learning**
+- **Deep Q-Networks (DQN)**
+- **Policy Gradient Methods**
+- **Actor-Critic Methods**
 
-### Usage
-Here is a quick example of how to use SympyRL:
+## System Architecture
+SympyRL consists of several main components:
+1. **Core Engine:** Responsible for the reinforcement learning logic.
+2. **Environment Handler:** Manages interactions with various environments.
+3. **Model Management:** Contains all implemented models and solvers.
+4. **Symbolic Computation Module:** Integrates symbolic capabilities.
+
+## Quick Start Examples
 ```python
-import sympy as sp
-import sympyrl
+from sympy_rl import SympyREnvironment, QLearningAgent
 
-# Define symbolic variables
-x = sp.symbols('x')
-
-# Define a simple function
-func = x**2 + 3*x + 5
-
-# Create a SympyRL agent
-agent = sympyrl.Agent()
-
-# Train the agent
-agent.train(env)
+environment = SympyREnvironment()
+agent = QLearningAgent(environment)
+agent.train(episodes=1000)
 ```
 
-### Contribution
-We welcome contributions! Please follow the guidelines in the CONTRIBUTING.md file for more details.
+## Project Structure
+- `sympy_rl/`: Main package
+  - `models/`: Contains implementation of different RL models
+  - `environments/`: Custom RL environments
+  - `utils/`: Utilities for training and evaluation
 
----
-For more detailed information, please refer to the individual module documentation within the library's source code.
+## Design Philosophy
+SympyRL is built with a focus on modularity and extensibility, allowing users to easily implement their own models and customize environments to fit their needs. The framework aims to balance between performance and simplicity to make it accessible to both novices and experts alike.
+
+## Roadmap
+- **Q2 2026:** Release of additional models including advanced deep learning algorithms.
+- **Q3 2026:** Improved documentation and more comprehensive examples.
+- **Q4 2026:** Integration with other symbolic computation libraries for greater functionality.
+
+## Installation
+You can install SympyRL using pip:
+```
+pip install sympy_rl
+```
+
+## Citation
+If you find SympyRL useful in your research or projects, please cite it as follows:
+```
+@misc{sympyrl,
+  title={SympyRL: A Symbolic Reinforcement Learning Framework},
+  author={AN-Best},
+  year={2026},
+}  
+```
+
+## License
+MIT License. See the [LICENSE](LICENSE) file for details.
+
+## Contact
+For inquiries, please contact [AN-Best](mailto:youremail@example.com).
+
+## Acknowledgements
+We would like to thank the community for their contributions and support in developing SympyRL.
