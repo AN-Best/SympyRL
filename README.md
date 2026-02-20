@@ -27,7 +27,7 @@ SympyRL aims to expand its capabilities further in the following areas:
 - Development of additional pre-trained policies for popular environments.
 - Continued integration with leading machine learning frameworks to provide an expansive toolkit for developers.
 
-## Emphasizing Key Features
+## Key Features
 - **Backend Support**: SympyRL is built to support both PyTorch and JAX, providing users with flexibility in their choice of tools for model training and evaluation.
 - **Batched GPU Simulation**: The library supports batched environments, allowing for more efficient learning and simulation processes that leverage modern GPU architectures.
 - **Pre-trained Policies**: Users can access pre-trained models that can be fine-tuned or utilized directly for different tasks in the symbolic physics simulations.
